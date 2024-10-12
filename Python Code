@@ -1,0 +1,180 @@
+import mysql.connector
+
+# Establishing the connection to the database
+conn = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="storm",
+    database="restaurant_db"
+)
+
+cursor = conn.cursor()
+
+def create_tables():
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS menu (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        price DECIMAL(10, 2) NOT NULL
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS customers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(15) NOT NULL
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        customer_id INT,
+        total DECIMAL(10, 2) NOT NULL,
+        FOREIGN KEY (customer_id) REFERENCES customers(id)
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT,
+        menu_id INT,
+        quantity INT,
+        FOREIGN KEY (order_id) REFERENCES orders(id),
+        FOREIGN KEY (menu_id) REFERENCES menu(id)
+    )
+    """)
+
+def add_menu_item(name, price):
+    sql = "INSERT INTO menu (name, price) VALUES (%s, %s)"
+    val = (name, price)
+    cursor.execute(sql, val)
+    conn.commit()
+    print(f"Menu item '{name}' added successfully.")
+
+def view_menu():
+    cursor.execute("SELECT * FROM menu")
+    result = cursor.fetchall()
+    for row in result:
+        print(f"ID: {row[0]}, Name: {row[1]}, Price: {row[2]}")
+
+def update_menu_item(item_id, name, price):
+    sql = "UPDATE menu SET name = %s, price = %s WHERE id = %s"
+    val = (name, price, item_id)
+    cursor.execute(sql, val)
+    conn.commit()
+    print(f"Menu item with ID {item_id} updated successfully.")
+
+def delete_menu_item(item_id):
+    sql = "DELETE FROM menu WHERE id = %s"
+    val = (item_id,)
+    cursor.execute(sql, val)
+    conn.commit()
+    print(f"Menu item with ID {item_id} deleted successfully.")
+
+def add_customer(name, phone):
+    sql = "INSERT INTO customers (name, phone) VALUES (%s, %s)"
+    val = (name, phone)
+    cursor.execute(sql, val)
+    conn.commit()
+    print(f"Customer '{name}' added successfully.")
+
+def view_customers():
+    cursor.execute("SELECT * FROM customers")
+    result = cursor.fetchall()
+    for row in result:
+        print(f"ID: {row[0]}, Name: {row[1]}, Phone: {row[2]}")
+
+def place_order(customer_id, order_items):
+    total = 0
+    for item_id, quantity in order_items.items():
+        cursor.execute("SELECT price FROM menu WHERE id = %s", (item_id,))
+        item = cursor.fetchone()
+        if item:
+            price = item[0]
+            total += price * quantity
+        else:
+            print(f"Item ID {item_id} not found.")
+            return
+
+    sql = "INSERT INTO orders (customer_id, total) VALUES (%s, %s)"
+    val = (customer_id, total)
+    cursor.execute(sql, val)
+    order_id = cursor.lastrowid
+
+    for item_id, quantity in order_items.items():
+        sql = "INSERT INTO order_items (order_id, menu_id, quantity) VALUES (%s, %s, %s)"
+        val = (order_id, item_id, quantity)
+        cursor.execute(sql, val)
+
+    conn.commit()
+    print(f"Order placed successfully. Total amount: {total}")
+
+def generate_sales_report():
+    cursor.execute("""
+    SELECT o.id, c.name, o.total
+    FROM orders o
+    JOIN customers c ON o.customer_id = c.id
+    """)
+    result = cursor.fetchall()
+    for row in result:
+        print(f"Order ID: {row[0]}, Customer: {row[1]}, Total: {row[2]}")
+
+def main():
+    create_tables()
+    while True:
+        print("\n1. Add Menu Item")
+        print("2. View Menu")
+        print("3. Update Menu Item")
+        print("4. Delete Menu Item")
+        print("5. Add Customer")
+        print("6. View Customers")
+        print("7. Place Order")
+        print("8. Generate Sales Report")
+        print("9. Exit")
+        choice = int(input("Enter your choice: "))
+
+        match choice:
+            case 1:
+                name = input("Enter item name: ")
+                price = float(input("Enter item price: "))
+                add_menu_item(name, price)
+            case 2:
+                view_menu()
+            case 3:
+                item_id = int(input("Enter item ID to update: "))
+                name = input("Enter new item name: ")
+                price = float(input("Enter new item price: "))
+                update_menu_item(item_id, name, price)
+            case 4:
+                item_id = int(input("Enter item ID to delete: "))
+                delete_menu_item(item_id)
+            case 5:
+                name = input("Enter customer name: ")
+                phone = input("Enter customer phone: ")
+                add_customer(name, phone)
+            case 6:
+                view_customers()
+            case 7:
+                customer_id = int(input("Enter customer ID: "))
+                order_items = {}
+                while True:
+                    item_id = int(input("Enter item ID to order (Press 0 to finish): "))
+                    if item_id == 0:
+                        break
+                    quantity = int(input("Enter quantity: "))
+                    order_items[item_id] = quantity
+                place_order(customer_id, order_items)
+            case 8:
+                generate_sales_report()
+            case 9:
+                print("Exiting...")
+                break
+            case _:
+                print("Invalid choice. Please try again.")
+
+if __name__ == "__main__":
+    main()
+
+# Closing the connection
+cursor.close()
+conn.close()
