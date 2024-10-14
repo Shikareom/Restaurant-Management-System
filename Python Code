@@ -3,8 +3,8 @@ import mysql.connector
 # Establishing the connection to the database
 conn = mysql.connector.connect(
     host="localhost",
-    user="root",
-    password="storm",
+    user="//username e.g.root",
+    password="//your password here",
     database="restaurant_db"
 )
 
